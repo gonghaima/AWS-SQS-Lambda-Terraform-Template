@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Terraform AWS SQS with Lambda</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <style>
+      .code-block {
+        font-family: 'Courier New', monospace;
+        background-color: #2d2d2d;
+        color: #f8f8f2;
+        border-radius: 0.5rem;
+        padding: 1rem;
+        overflow-x: auto;
+        position: relative;
+      }
+      .copy-btn {
+        position: absolute;
+        top: 0.5rem;
+        right: 0.5rem;
+        background-color: #4a5568;
+        color: white;
+        border: none;
+        border-radius: 0.25rem;
+        padding: 0.25rem 0.5rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+      .copy-btn:hover {
+        background-color: #2d3748;
+      }
+      .copy-btn.copied {
+        background-color: #38a169;
+      }
+      pre {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+      <div class="max-w-4xl mx-auto">
+        <!-- Header -->
+        <div class="text-center mb-8">
+          <h1 class="text-3xl font-bold text-gray-800 mb-2">
+            AWS SQS with Lambda Terraform Template
+          </h1>
+          <p class="text-gray-600">
+            A complete Terraform configuration to deploy an SQS queue with a
+            Lambda function trigger
+          </p>
+        </div>
+
+        <!-- Description Card -->
+        <div class="bg-white rounded-lg shadow-md p-6 mb-8">
+          <div class="flex items-center mb-4">
+            <div class="bg-blue-100 p-3 rounded-full mr-4">
+              <i class="fas fa-info-circle text-blue-600 text-xl"></i>
+            </div>
+            <h2 class="text-xl font-semibold text-gray-800">
+              About This Template
+            </h2>
+          </div>
+          <p class="text-gray-700 mb-4">
+            This Terraform template creates an AWS SQS queue and configures a
+            Lambda function to be triggered by messages in the queue. The
+            template includes all necessary IAM permissions and resource
+            configurations.
+          </p>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div class="bg-blue-50 p-4 rounded-lg">
+              <h3 class="font-medium text-blue-800 mb-2">SQS Queue</h3>
+              <p class="text-sm text-blue-600">
+                Standard queue with configurable visibility timeout and message
+                retention
+              </p>
+            </div>
+            <div class="bg-green-50 p-4 rounded-lg">
+              <h3 class="font-medium text-green-800 mb-2">Lambda Function</h3>
+              <p class="text-sm text-green-600">
+                Node.js function with SQS trigger and proper IAM permissions
+              </p>
+            </div>
+            <div class="bg-purple-50 p-4 rounded-lg">
+              <h3 class="font-medium text-purple-800 mb-2">IAM Roles</h3>
+              <p class="text-sm text-purple-600">
+                Least privilege permissions for Lambda to consume SQS messages
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Terraform Code -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+          <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center">
+              <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <span class="text-gray-300 text-sm">main.tf</span>
+            <button
+              id="copy-all-btn"
+              class="text-gray-300 hover:text-white text-sm flex items-center"
+            >
+              <i class="fas fa-copy mr-1"></i> Copy All
+            </button>
+          </div>
+          <div class="code-block" id="terraform-code">
+            <button class="copy-btn" onclick="copyCode('terraform-code')">
+              <i class="fas fa-copy"></i>
+            </button>
+            <pre><code># Terraform configuration for AWS SQS with Lambda trigger
+
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 4.0"
+    }
+  }
+}
+
+provider "aws" {
+  region = "us-east-1" # Change to your preferred region
+}
+
+# Create SQS queue
+resource "aws_sqs_queue" "example_queue" {
+  name                      = "example-queue"
+  delay_seconds             = 0
+  max_message_size          = 262144 # 256 KiB
+  message_retention_seconds = 345600 # 4 days
+  receive_wait_time_seconds = 10     # Long polling wait time
+  visibility_timeout_seconds = 30    # Should be >= Lambda timeout
+
+  tags = {
+    Environment = "production"
+  }
+}
+
+# IAM role for Lambda execution
+resource "aws_iam_role" "lambda_exec_role" {
+  name = "lambda_exec_role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "lambda.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+# IAM policy for Lambda to access SQS
+resource "aws_iam_policy" "lambda_sqs_policy" {
+  name        = "lambda_sqs_policy"
+  description = "Policy for Lambda to read from SQS"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.example_queue.arn
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents"
+        ]
+        Resource = "arn:aws:logs:*:*:*"
+      }
+    ]
+  })
+}
+
+# Attach policy to Lambda role
+resource "aws_iam_role_policy_attachment" "lambda_sqs_attachment" {
+  role       = aws_iam_role.lambda_exec_role.name
+  policy_arn = aws_iam_policy.lambda_sqs_policy.arn
+}
+
+# Lambda function
+resource "aws_lambda_function" "sqs_processor" {
+  filename      = "lambda_function.zip" # Replace with your Lambda package
+  function_name = "sqs_processor"
+  role          = aws_iam_role.lambda_exec_role.arn
+  handler       = "index.handler"
+  runtime       = "nodejs14.x" # Change to your preferred runtime
+
+  source_code_hash = filebase64sha256("lambda_function.zip")
+
+  environment {
+    variables = {
+      QUEUE_URL = aws_sqs_queue.example_queue.url
+    }
+  }
+}
+
+# Lambda event source mapping
+resource "aws_lambda_event_source_mapping" "sqs_trigger" {
+  event_source_arn = aws_sqs_queue.example_queue.arn
+  function_name    = aws_lambda_function.sqs_processor.arn
+  batch_size       = 10 # Number of messages to process at once
+}</code></pre>
+          </div>
+        </div>
+
+        <!-- Lambda Code Example -->
+        <div class="bg-white rounded-lg shadow-md overflow-hidden mb-8">
+          <div class="bg-gray-800 px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center">
+              <div class="w-3 h-3 rounded-full bg-red-500 mr-2"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500 mr-2"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+            </div>
+            <span class="text-gray-300 text-sm">index.js</span>
+            <button
+              id="copy-lambda-btn"
+              class="text-gray-300 hover:text-white text-sm flex items-center"
+            >
+              <i class="fas fa-copy mr-1"></i> Copy
+            </button>
+          </div>
+          <div class="code-block" id="lambda-code">
+            <button class="copy-btn" onclick="copyCode('lambda-code')">
+              <i class="fas fa-copy"></i>
+            </button>
+            <pre><code>// Example Lambda function to process SQS messages
+exports.handler = async (event) => {
+    console.log('Received event:', JSON.stringify(event, null, 2));
+    
+    for (const record of event.Records) {
+        try {
+            const message = JSON.parse(record.body);
+            console.log('Processing message:', message);
+            
+            // Your message processing logic here
+            // Example: Send to another service, transform data, etc.
+            
+            console.log('Successfully processed message ID:', record.messageId);
+        } catch (error) {
+            console.error('Error processing message:', error);
+            // You might want to implement dead-letter queue handling here
+            throw error; // This will make Lambda retry the batch
+        }
+    }
+    
+    return {
+        statusCode: 200,
+        body: JSON.stringify('Messages processed successfully')
+    };
+};</code></pre>
+          </div>
+        </div>
+
+        <!-- Deployment Instructions -->
+        <div class="bg-white rounded-lg shadow-md p-6">
+          <h2
+            class="text-xl font-semibold text-gray-800 mb-4 flex items-center"
+          >
+            <i class="fas fa-rocket text-blue-500 mr-3"></i> Deployment
+            Instructions
+          </h2>
+          <ol class="list-decimal list-inside space-y-3 text-gray-700">
+            <li>
+              Save the Terraform code to a file named
+              <code class="bg-gray-100 px-1 rounded">main.tf</code>
+            </li>
+            <li>
+              Save the Lambda code to a file named
+              <code class="bg-gray-100 px-1 rounded">index.js</code>
+            </li>
+            <li>
+              Zip the Lambda file:
+              <code class="bg-gray-100 px-1 rounded"
+                >zip lambda_function.zip index.js</code
+              >
+            </li>
+            <li>
+              Initialize Terraform:
+              <code class="bg-gray-100 px-1 rounded">terraform init</code>
+            </li>
+            <li>
+              Review the execution plan:
+              <code class="bg-gray-100 px-1 rounded">terraform plan</code>
+            </li>
+            <li>
+              Apply the configuration:
+              <code class="bg-gray-100 px-1 rounded">terraform apply</code>
+            </li>
+            <li>
+              To destroy resources when done:
+              <code class="bg-gray-100 px-1 rounded">terraform destroy</code>
+            </li>
+          </ol>
+          <div
+            class="mt-6 p-4 bg-yellow-50 rounded-lg border-l-4 border-yellow-400"
+          >
+            <div class="flex">
+              <div class="flex-shrink-0">
+                <i class="fas fa-exclamation-triangle text-yellow-500 mt-1"></i>
+              </div>
+              <div class="ml-3">
+                <h3 class="text-sm font-medium text-yellow-800">
+                  Important Notes
+                </h3>
+                <div class="mt-2 text-sm text-yellow-700">
+                  <ul class="list-disc list-inside space-y-1">
+                    <li>
+                      Make sure your AWS credentials are properly configured
+                    </li>
+                    <li>
+                      The Lambda timeout should be less than the SQS visibility
+                      timeout
+                    </li>
+                    <li>
+                      Consider adding a dead-letter queue for failed messages
+                    </li>
+                    <li>Monitor your Lambda concurrency to avoid throttling</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      function copyCode(elementId) {
+        const element = document.getElementById(elementId);
+        const code = element.querySelector('code').textContent;
+
+        navigator.clipboard.writeText(code).then(() => {
+          const btn = element.querySelector('.copy-btn');
+          btn.innerHTML = '<i class="fas fa-check"></i>';
+          btn.classList.add('copied');
+
+          setTimeout(() => {
+            btn.innerHTML = '<i class="fas fa-copy"></i>';
+            btn.classList.remove('copied');
+          }, 2000);
+        });
+      }
+
+      document.getElementById('copy-all-btn').addEventListener('click', () => {
+        const terraformCode = document
+          .getElementById('terraform-code')
+          .querySelector('code').textContent;
+        const lambdaCode = document
+          .getElementById('lambda-code')
+          .querySelector('code').textContent;
+        const fullCode =
+          terraformCode + '\n\n// Lambda Function Code:\n\n' + lambdaCode;
+
+        navigator.clipboard.writeText(fullCode).then(() => {
+          const btn = document.getElementById('copy-all-btn');
+          const originalText = btn.innerHTML;
+          btn.innerHTML = '<i class="fas fa-check mr-1"></i> Copied!';
+
+          setTimeout(() => {
+            btn.innerHTML = originalText;
+          }, 2000);
+        });
+      });
+
+      document
+        .getElementById('copy-lambda-btn')
+        .addEventListener('click', () => {
+          copyCode('lambda-code');
+        });
+    </script>
+  </body>
+</html>
